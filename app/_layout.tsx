@@ -1,9 +1,11 @@
-import { AuthProvider } from '@/contexts/AuthContext';
+import LoadingScreen from '@/components/LoadingScreen';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { CartProvider } from '@/contexts/CartContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import React, { useEffect } from 'react';
 import 'react-native-reanimated';
 
 export const unstable_settings = {
@@ -16,15 +18,38 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AuthProvider>
-        <CartProvider>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Thông tin quán' }} />
-            {/* auth screens are in (auth) group; register a fallback route to allow deep links */}
-          </Stack>
-          <StatusBar style="auto" />
-        </CartProvider>
+        <InnerApp />
       </AuthProvider>
     </ThemeProvider>
+  );
+}
+
+function InnerApp() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading) {
+      if (user) {
+        router.replace('/');
+      } else {
+        router.replace('/login');
+      }
+    }
+  }, [loading, user, router]);
+
+  if (loading) return <LoadingScreen />;
+
+  return (
+    <CartProvider>
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="modal"
+          options={{ presentation: 'modal', title: 'Thông tin quán' }}
+        />
+      </Stack>
+      <StatusBar style="auto" />
+    </CartProvider>
   );
 }

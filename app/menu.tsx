@@ -1,6 +1,6 @@
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity } from "react-native";
 import { useState } from "react";
-import { useRouter } from "expo-router"; // ✅ dùng hook
+import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+// removed unused router import
 
 type Drink = {
   id: number;
@@ -10,14 +10,13 @@ type Drink = {
 };
 
 const drinks: Drink[] = [
-  { id: 1, name: "Latte Kem Sữa", price: 49, image: require("@/assets/images/nuoc/latte.jpg") },
-  { id: 2, name: "Trà Đào Cam Sả", price: 45, image: require("@/assets/images/nuoc/tea.jpg") },
-  { id: 3, name: "Cà Phê Muối", price: 55, image: require("@/assets/images/nuoc/saltcoffee.jpg") },
-  { id: 4, name: "Trà Sữa Trân Châu", price: 42, image: require("@/assets/images/nuoc/milktea.jpg") },
+  { id: 1, name: "Latte Kem Sữa", price: 49, image: require("../assets/images/nuoc/latte.jpg") },
+  { id: 2, name: "Trà Đào Cam Sả", price: 45, image: require("../assets/images/nuoc/tea.jpg") },
+  { id: 3, name: "Cà Phê Muối", price: 55, image: require("../assets/images/nuoc/saltcoffee.jpg") },
+  { id: 4, name: "Trà Sữa Trân Châu", price: 42, image: require("../assets/images/nuoc/milktea.jpg") },
 ];
 
 export default function MenuScreen() {
-  const router = useRouter();
   const [cart, setCart] = useState<Drink[]>([]);
 
   const addToCart = (item: Drink) => {

@@ -1,31 +1,143 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { useContext, useMemo, useState } from "react";
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+
+import { CartContext } from "@/contexts/CartContext";
 
 export default function CheckoutScreen() {
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "momo" | "bank">("cash");
   const router = useRouter();
+  const { items, clear } = useContext(CartContext);
 
-  const handleCheckout = () => {
-    // Xử lý thanh toán ở đây (nếu có)
+  const [paymentMethod, setPaymentMethod] =
+    useState<"cash" | "momo" | "bank">("cash");
 
-    router.replace("/"); // điều hướng về trang chủ
-  };
+  const [customerName, setCustomerName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [note, setNote] = useState("");
+
+  /* ===== TÍNH TIỀN ===== */
+  const subtotal = useMemo(
+    () => items.reduce((sum, i) => sum + i.price * i.qty, 0),
+    [items]
+  );
+
+  const shippingFee = 0;
+  const total = subtotal + shippingFee;
+
+  /* ===== BUILD ORDER ===== */
+const buildOrderPayload = () => ({
+  table: {
+    id: 1, // ✅ LUÔN LÀ BÀN 1
+  },
+
+  customerName,
+  address,
+  paymentMethod,
+  note,
+
+  discount: 0,
+
+  orderItems: items.map((i) => ({
+    product: {
+      id: i.productId,
+    },
+    quantity: i.qty,
+    size: i.options?.size,
+  })),
+});
+  /* ===== SUBMIT ===== */
+const handleCheckout = async () => {
+  if (!items.length) {
+    Alert.alert("Thông báo", "Giỏ hàng trống");
+    return;
+  }
+
+  if (!customerName || !phone || !address) {
+    Alert.alert("Thiếu thông tin", "Vui lòng nhập đầy đủ thông tin giao hàng");
+    return;
+  }
+
+  try {
+    const token = await AsyncStorage.getItem("token");
+
+    const payload = buildOrderPayload();
+
+    // ✅ LOG DATA GỬI VỀ BACKEND
+    console.log("===== ORDER PAYLOAD =====");
+    console.log(JSON.stringify(payload, null, 2));
+    console.log("=========================");
+
+    const res = await fetch(
+      "https://example10-production-1d2e.up.railway.app/api/orders",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.log("❌ BACKEND ERROR:", err);
+      throw new Error(err);
+    }
+
+    const data = await res.json();
+
+    // ✅ LOG RESPONSE BACKEND
+    console.log("✅ BACKEND RESPONSE:", data);
+
+    clear();
+    Alert.alert("Thành công", "Đặt hàng thành công 🎉");
+    router.replace("/");
+  } catch (e: any) {
+    console.log("🔥 CHECKOUT ERROR:", e);
+    Alert.alert("Lỗi", e.message || "Đặt hàng thất bại");
+  }
+};
 
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        
-        {/* Title */}
+        {/* TITLE */}
         <Text style={styles.title}>Thanh toán</Text>
 
-        {/* Order Summary */}
+        {/* ===== ORDER SUMMARY ===== */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Tóm tắt đơn hàng</Text>
 
+          {items.map((item) => (
+            <View key={item.id} style={styles.itemRow}>
+              <Text style={styles.itemName}>
+                {item.name}
+                {item.options?.size ? ` (${item.options.size})` : ""} × {item.qty}
+              </Text>
+              <Text style={styles.itemPrice}>
+                {(item.price * item.qty).toLocaleString()}đ
+              </Text>
+            </View>
+          ))}
+
+          <View style={styles.divider} />
+
           <View style={styles.itemRow}>
-            <Text style={styles.itemName}>Giá sản phẩm</Text>
-            <Text style={styles.itemPrice}>150.000đ</Text>
+            <Text style={styles.itemName}>Tạm tính</Text>
+            <Text style={styles.itemPrice}>
+              {subtotal.toLocaleString()}đ
+            </Text>
           </View>
 
           <View style={styles.itemRow}>
@@ -35,43 +147,43 @@ export default function CheckoutScreen() {
 
           <View style={styles.divider} />
 
-          <View className="totalRow">
+          <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Tổng cộng</Text>
-            <Text style={styles.totalPrice}>150.000đ</Text>
+            <Text style={styles.totalPrice}>
+              {total.toLocaleString()}đ
+            </Text>
           </View>
         </View>
 
-        {/* Delivery Info */}
+        {/* ===== DELIVERY INFO ===== */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Thông tin giao hàng</Text>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Họ và tên *</Text>
-            <TextInput style={styles.input} placeholder="Nhập tên của bạn" placeholderTextColor="#999" />
-          </View>
+          <TextInput
+            style={styles.input}
+            value={customerName}
+            onChangeText={setCustomerName}
+            placeholder="Họ và tên"
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Số điện thoại *</Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="phone-pad"
-              placeholder="Nhập số điện thoại"
-              placeholderTextColor="#999"
-            />
-          </View>
+          <TextInput
+            style={styles.input}
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            placeholder="Số điện thoại"
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Địa chỉ giao hàng *</Text>
-            <TextInput
-              style={[styles.input, { height: 60 }]}
-              multiline
-              placeholder="Nhập địa chỉ đầy đủ"
-              placeholderTextColor="#999"
-            />
-          </View>
+          <TextInput
+            style={[styles.input, { height: 60 }]}
+            value={address}
+            onChangeText={setAddress}
+            multiline
+            placeholder="Địa chỉ giao hàng"
+          />
         </View>
 
-        {/* Payment Method */}
+        {/* ===== PAYMENT ===== */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Phương thức thanh toán</Text>
 
@@ -79,156 +191,112 @@ export default function CheckoutScreen() {
             { key: "cash", label: "Thanh toán khi nhận hàng (COD)" },
             { key: "momo", label: "Ví MoMo" },
             { key: "bank", label: "Chuyển khoản ngân hàng" },
-          ].map((option) => (
+          ].map((o) => (
             <TouchableOpacity
-              key={option.key}
+              key={o.key}
               style={[
                 styles.paymentOption,
-                paymentMethod === option.key && styles.paymentOptionActive,
+                paymentMethod === o.key && styles.paymentOptionActive,
               ]}
-              onPress={() => setPaymentMethod(option.key as any)}
+              onPress={() => setPaymentMethod(o.key as any)}
             >
               <View
                 style={[
                   styles.radio,
-                  paymentMethod === option.key && styles.radioActive,
+                  paymentMethod === o.key && styles.radioActive,
                 ]}
               />
-              <Text style={styles.paymentLabel}>{option.label}</Text>
+              <Text>{o.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Note */}
+        {/* NOTE */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Ghi chú đơn hàng (không bắt buộc)</Text>
+          <Text style={styles.sectionTitle}>Ghi chú</Text>
           <TextInput
             style={[styles.input, { height: 60 }]}
+            value={note}
+            onChangeText={setNote}
             multiline
-            placeholder="Ví dụ: Giao giờ hành chính..."
-            placeholderTextColor="#999"
+            placeholder="Ghi chú đơn hàng"
           />
         </View>
-
       </ScrollView>
 
-      {/* Footer Button */}
+      {/* FOOTER */}
       <View style={styles.footer}>
         <TouchableOpacity style={styles.checkoutBtn} onPress={handleCheckout}>
-          <Text style={styles.checkoutBtnText}>Xác nhận thanh toán - 150.000đ</Text>
+          <Text style={styles.checkoutBtnText}>
+            Xác nhận đặt hàng – {total.toLocaleString()}đ
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
+/* ================== STYLES ================== */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F2E3C6" },
+  scrollContent: { padding: 16, paddingBottom: 120 },
+  title: { fontSize: 22, fontWeight: "700", textAlign: "center", marginBottom: 16 },
 
-  scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 110 },
+  section: { backgroundColor: "#fff", padding: 16, borderRadius: 12, marginBottom: 16 },
+  sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 12 },
 
-  title: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#2F2F2F",
-    textAlign: "center",
-    marginBottom: 16,
-  },
+  itemRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6 },
+  itemName: { fontSize: 14, color: "#555" },
+  itemPrice: { fontWeight: "700", color: "#C94A3A" },
 
-  section: {
-    backgroundColor: "#fff",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#2F2F2F",
-    marginBottom: 12,
-  },
+  divider: { height: 1, backgroundColor: "#eee", marginVertical: 10 },
 
-  itemRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-  },
-  itemName: { fontSize: 14, color: "#5B5B5B" },
-  itemPrice: { fontSize: 14, fontWeight: "700", color: "#C94A3A" },
-
-  divider: {
-    height: 1,
-    backgroundColor: "#E8E8E8",
-    marginVertical: 10,
-  },
-
-  totalRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 6,
-  },
-  totalLabel: { fontSize: 15, fontWeight: "700", color: "#2F2F2F" },
+  totalRow: { flexDirection: "row", justifyContent: "space-between" },
+  totalLabel: { fontWeight: "700" },
   totalPrice: { fontSize: 18, fontWeight: "800", color: "#C94A3A" },
 
-  inputGroup: { marginBottom: 12 },
-  label: { fontSize: 13, fontWeight: "600", color: "#2F2F2F", marginBottom: 6 },
   input: {
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: "#ddd",
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "#FAFAFA",
-    color: "#333",
+    padding: 10,
+    marginBottom: 10,
+    backgroundColor: "#fafafa",
   },
 
   paymentOption: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#E8E8E8",
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 12,
     marginBottom: 8,
   },
   paymentOptionActive: {
     borderColor: "#C94A3A",
-    backgroundColor: "rgba(201, 74, 58, 0.08)",
+    backgroundColor: "rgba(201,74,58,0.08)",
   },
 
   radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     borderWidth: 2,
-    borderColor: "#D0D0D0",
-    marginRight: 12,
+    borderColor: "#ccc",
+    marginRight: 10,
   },
   radioActive: {
     borderColor: "#C94A3A",
     backgroundColor: "#C94A3A",
   },
 
-  paymentLabel: { fontSize: 14, fontWeight: "500", color: "#333" },
-
-  footer: {
-    position: "absolute",
-    bottom: 30,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 16,
-  },
-
+  footer: { position: "absolute", bottom: 20, left: 16, right: 16 },
   checkoutBtn: {
     backgroundColor: "#C94A3A",
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 12,
     alignItems: "center",
   },
-  checkoutBtnText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
+  checkoutBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 });

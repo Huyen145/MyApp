@@ -2,18 +2,26 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useEffect, useState } from 'react';
 
 export type CartItem = {
-  id: number;
+  id: string; // unique cart id (productId + options fingerprint)
+  productId?: number;
   name: string;
   price: number;
   qty: number;
   image?: any;
+  options?: {
+    size?: string;
+    flavor?: string;
+    notes?: string[];
+    customText?: string;
+    [k: string]: any;
+  };
 };
 
 type CartContextType = {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, 'qty'>, qty?: number) => void;
-  removeItem: (id: number) => void;
-  updateQty: (id: number, qty: number) => void;
+  addItem: (item: Omit<CartItem, 'qty' | 'id'> & { productId?: number }, qty?: number) => void;
+  removeItem: (id: string) => void;
+  updateQty: (id: string, qty: number) => void;
   clear: () => void;
   total: () => number;
   placeOrder: () => Promise<{ ok: boolean; orderId?: string }>;
@@ -41,21 +49,30 @@ export function CartProvider({ children }: { children: ReactNode }) {
     AsyncStorage.setItem(CART_KEY, JSON.stringify(items)).catch(() => {});
   }, [items]);
 
-  function addItem(item: Omit<CartItem, 'qty'>, qty = 1) {
+  function addItem(item: Omit<CartItem, 'qty' | 'id'> & { productId?: number }, qty = 1) {
+    // normalize image strings to { uri } so RN <Image> and storage work consistently
+    const normalizedItem = {
+      ...item,
+      image: typeof item.image === 'string' ? { uri: item.image } : item.image,
+    } as Omit<CartItem, 'qty' | 'id'> & { productId?: number };
+
+    const optionsKey = normalizedItem.options ? JSON.stringify(normalizedItem.options) : '';
+    const id = `${normalizedItem.productId ?? normalizedItem.id ?? 'p'}-${encodeURIComponent(optionsKey || 'default')}`;
+
     setItems((cur) => {
-      const exists = cur.find((i) => i.id === item.id);
+      const exists = cur.find((i) => i.id === id);
       if (exists) {
-        return cur.map((i) => (i.id === item.id ? { ...i, qty: i.qty + qty } : i));
+        return cur.map((i) => (i.id === id ? { ...i, qty: i.qty + qty } : i));
       }
-      return [...cur, { ...item, qty }];
+      return [...cur, { ...normalizedItem, qty, id } as CartItem];
     });
   }
 
-  function removeItem(id: number) {
+  function removeItem(id: string) {
     setItems((cur) => cur.filter((i) => i.id !== id));
   }
 
-  function updateQty(id: number, qty: number) {
+  function updateQty(id: string, qty: number) {
     setItems((cur) => cur.map((i) => (i.id === id ? { ...i, qty } : i)));
   }
 

@@ -1,138 +1,170 @@
-import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
 import {
-  View,
-  TextInput,
-  TouchableOpacity,
-  Text,
-  StyleSheet,
   Alert,
   KeyboardAvoidingView,
   Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { router } from "expo-router";
 
-export default function SignUpScreen() {
-  const [name, setName] = useState('');
+export default function SignupScreen() {
+  const { signUp } = useAuth();
+  const router = useRouter();
+
+  const [username, setUsername] = useState('');
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSignUp = () => {
-    if (!name || !email || !password) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
+  async function handleSignup() {
+    setError('');
+
+    if (!username || !fullName || !email || !password) {
+      setError('Vui lòng nhập đầy đủ thông tin');
       return;
     }
 
-    Alert.alert('Thành công', 'Đăng ký thành công!');
-    router.push('/login');
-  };
+    if (password !== confirm) {
+      setError('Mật khẩu xác nhận không khớp');
+      return;
+    }
+
+    setLoading(true);
+
+    const ok = await signUp({
+      username,
+      password,
+      full_name: fullName,
+      email,
+    });
+
+    setLoading(false);
+
+    if (!ok) {
+      setError('Username đã tồn tại hoặc lỗi kết nối');
+      return;
+    }
+
+    Alert.alert('Thành công', 'Đăng ký thành công', [
+      { text: 'OK', onPress: () => router.replace('/login') },
+    ]);
+  }
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.card}>
-        <Text style={styles.title}>Tạo tài khoản Coffee House</Text>
+        <Text style={styles.title}>Tạo tài khoản</Text>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Họ và tên"
-          placeholderTextColor="#8B6F47"
-          value={name}
-          onChangeText={setName}
-        />
+        <Input placeholder="Username" value={username} set={setUsername} />
+        <Input placeholder="Họ tên" value={fullName} set={setFullName} />
+        <Input placeholder="Email" value={email} set={setEmail} />
+        <Input placeholder="Mật khẩu" value={password} set={setPassword} secure />
+        <Input placeholder="Xác nhận mật khẩu" value={confirm} set={setConfirm} secure />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor="#8B6F47"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
+        {!!error && <Text style={styles.error}>{error}</Text>}
 
-        <TextInput
-          style={styles.input}
-          placeholder="Mật khẩu"
-          placeholderTextColor="#8B6F47"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
-
-        <TouchableOpacity style={styles.button} onPress={handleSignUp} activeOpacity={0.85}>
-          <Text style={styles.buttonText}>Đăng ký</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.bottomText}>
-          Đã có tài khoản?{' '}
-          <Text style={styles.bottomLink} onPress={() => router.push('/login')}>
-            Đăng nhập
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleSignup}
+          disabled={loading}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? 'Đang tạo...' : 'Đăng ký'}
           </Text>
-        </Text>
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
+/* ===== INPUT COMPONENT ===== */
+function Input({
+  value,
+  set,
+  placeholder,
+  secure = false,
+}: {
+  value: string;
+  set: (v: string) => void;
+  placeholder: string;
+  secure?: boolean;
+}) {
+  return (
+    <View style={styles.inputRow}>
+      <Ionicons name="person-outline" size={20} color="#000" />
+      <TextInput
+        style={styles.input}
+        placeholder={placeholder}
+        value={value}
+        onChangeText={set}
+        secureTextEntry={secure}
+      />
+    </View>
+  );
+}
+
+/* ===== STYLES ===== */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F4EDE3',
     justifyContent: 'center',
     paddingHorizontal: 24,
-    backgroundColor: '#F4EDE3',
   },
   card: {
     backgroundColor: '#FFFDF9',
-    padding: 26,
-    borderRadius: 18,
+    padding: 24,
+    borderRadius: 20,
     elevation: 4,
-    shadowColor: '#8B4513',
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 5 },
   },
   title: {
-    fontSize: 26,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 24,
+    fontSize: 20,
     color: '#5A3A22',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FAF6F1',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E8D7C1',
+    marginBottom: 12,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#C8B49A',
-    borderRadius: 12,
-    padding: 14,
+    flex: 1,
+    marginLeft: 10,
     fontSize: 16,
-    marginBottom: 16,
-    backgroundColor: '#FAF6F1',
   },
   button: {
-    backgroundColor: '#8B4513',
+    backgroundColor: '#C94A3A',
     paddingVertical: 14,
     borderRadius: 12,
+    marginTop: 6,
     alignItems: 'center',
-    marginTop: 10,
-    shadowColor: '#8B4513',
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
   },
   buttonText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  bottomText: {
-    textAlign: 'center',
-    marginTop: 20,
-    fontSize: 15,
-    color: '#6B5641',
-  },
-  bottomLink: {
-    color: '#8B4513',
+    fontSize: 16,
     fontWeight: '700',
+  },
+  error: {
+    color: '#C94A3A',
+    marginBottom: 10,
+    textAlign: 'center',
   },
 });

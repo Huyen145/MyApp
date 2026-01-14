@@ -1,82 +1,193 @@
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { AuthContext } from '@/contexts/AuthContext';
-import React, { useContext, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Link, useRouter } from 'expo-router';
+import { useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useAuth } from '@/contexts/AuthContext';
 
-export default function LoginScreen({ navigation }: any) {
-  const { signIn } = useContext(AuthContext);
-  const [email, setEmail] = useState('');
+export default function LoginScreen() {
+  const router = useRouter();
+  const { signIn } = useAuth();
+
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
-  async function onLogin() {
-    setLoading(true);
-    setError('');
-    try {
-      const ok = await signIn(email.trim(), password);
-      if (!ok) setError('Đăng nhập thất bại');
-    } catch {
-      setError('Đã xảy ra lỗi');
-    } finally {
-      setLoading(false);
+  const handleLogin = async () => {
+    if (!username || !password) {
+      Alert.alert('Lỗi', 'Vui lòng nhập tên đăng nhập và mật khẩu');
+      return;
     }
-  }
+
+    setLoading(true);
+    const success = await signIn(username, password);
+    setLoading(false);
+
+    if (success) {
+      router.replace('/');
+    } else {
+      Alert.alert('Thất bại', 'Sai tài khoản hoặc mật khẩu');
+    }
+  };
 
   return (
-    <ThemedView style={styles.container}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, width: '100%' }}>
-        <View style={styles.inner}>
-          <ThemedText type="title" style={styles.title}>Welcome Back</ThemedText>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <View style={styles.card}>
+        <Text style={styles.brand}>Tiệm Bánh Mây</Text>
+        <Text style={styles.title}>Đăng nhập</Text>
 
+        <View style={styles.inputRow}>
+          <Ionicons name="person-outline" size={20} color="#8B6F47" />
           <TextInput
             style={styles.input}
-            placeholder="Email"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            value={email}
-            onChangeText={setEmail}
+            placeholder="Tên đăng nhập"
+            value={username}
+            onChangeText={setUsername}
           />
+        </View>
 
+        <View style={styles.inputRow}>
+          <Ionicons name="lock-closed-outline" size={20} color="#8B6F47" />
           <TextInput
             style={styles.input}
-            placeholder="Password"
+            placeholder="Mật khẩu"
             secureTextEntry
             value={password}
             onChangeText={setPassword}
           />
-
-          {!!error && <Text style={styles.error}>{error}</Text>}
-
-          <TouchableOpacity style={styles.btn} onPress={onLogin} disabled={loading}>
-            <Text style={styles.btnText}>{loading ? 'Loading...' : 'Sign in'}</Text>
-          </TouchableOpacity>
-
-          <View style={styles.row}>
-            <Text>Don&apos;t have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.push('signup')}>
-              <Text style={{ color: '#C94A3A', fontWeight: '700' }}> Sign up</Text>
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity style={styles.link} onPress={() => navigation.push('forgot')}>
-            <Text style={{ color: '#6B6B6B' }}>Forgot password?</Text>
-          </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
-    </ThemedView>
+
+        <TouchableOpacity style={styles.button} onPress={handleLogin}>
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Đăng nhập</Text>}
+        </TouchableOpacity>
+
+<View style={styles.linksRow}>
+  <Link href="/signup">
+    <Text style={styles.linkText}>Đăng ký</Text>
+  </Link>
+
+  <Link href="/forgot">
+    <Text style={styles.linkText}>Quên mật khẩu?</Text>
+  </Link>
+</View>
+
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
+
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  inner: { width: '86%', alignItems: 'center' },
-  title: { fontSize: 28, marginBottom: 20 },
-  input: { width: '100%', padding: 12, borderRadius: 10, backgroundColor: '#fff', marginBottom: 12, borderWidth: 1, borderColor: '#eee' },
-  btn: { width: '100%', backgroundColor: '#C94A3A', padding: 14, borderRadius: 10, alignItems: 'center', marginTop: 8 },
-  btnText: { color: '#fff', fontWeight: '700' },
-  row: { flexDirection: 'row', marginTop: 12 },
-  link: { marginTop: 8 },
-  error: { color: '#C94A3A', marginBottom: 8 },
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    backgroundColor: '#F4EDE3',
+  },
+  card: {
+    backgroundColor: '#FFFDF9',
+    padding: 24,
+    borderRadius: 20,
+    elevation: 4,
+    shadowColor: '#8B4513',
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  brand: {
+    fontSize: 24,
+    color: '#8B4513',
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  title: {
+    fontSize: 20,
+    marginBottom: 18,
+    color: '#5A3A22',
+    textAlign: 'center',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FAF6F1',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#E8D7C1',
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    marginLeft: 10,
+  },
+  button: {
+    width: '100%',
+    backgroundColor: '#C94A3A',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  linksRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  linkText: {
+    color: '#8B4513',
+    fontWeight: '600',
+  },
+  orRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  line: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E8D7C1',
+  },
+  orText: {
+    marginHorizontal: 8,
+    color: '#B0865F',
+    fontWeight: '500',
+  },
+  socialRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 14,
+  },
+  socialBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12,
+    marginHorizontal: 6,
+  },
+  socialText: {
+    marginLeft: 8,
+    fontSize: 15,
+    color: '#6B6B6B',
+    fontWeight: '500',
+  },
 });

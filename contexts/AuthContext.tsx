@@ -1,64 +1,139 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, ReactNode, useEffect, useState } from 'react';
+import axios from 'axios';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 
+/* ===== CONFIG ===== */
+const API_URL = 'https://example10-production-1d2e.up.railway.app/api';
+
+/* ===== TYPES ===== */
 type User = {
-  id: string;
-  name?: string;
-  email?: string;
-  phone?: string;
-  avatar?: string;
+  id: number;
+  username: string;
+  email: string;
+  roles: string[];
+};
+
+type SignUpPayload = {
+  username: string;
+  password: string;
+  email: string;
+  full_name: string;
 };
 
 type AuthContextType = {
   user: User | null;
+  token: string | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<boolean>;
-  signUp: (name: string, email: string, password: string) => Promise<boolean>;
+  signIn: (username: string, password: string) => Promise<boolean>;
+  signUp: (data: SignUpPayload) => Promise<boolean>;
   signOut: () => Promise<void>;
 };
 
-export const AuthContext = createContext<AuthContextType>({} as AuthContextType);
+const AuthContext = createContext<AuthContextType | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  /* ===== AUTO LOGIN ===== */
   useEffect(() => {
-    (async () => {
+    const initAuth = async () => {
       try {
-        const raw = await AsyncStorage.getItem('@app_user');
-        if (raw) setUser(JSON.parse(raw));
-      } catch (e) {
-        // ignore
+        const storedToken = await AsyncStorage.getItem('token');
+        const storedUser = await AsyncStorage.getItem('user');
+
+        if (storedToken && storedUser) {
+          setToken(storedToken);
+          setUser(JSON.parse(storedUser));
+          axios.defaults.headers.common.Authorization = `Bearer ${storedToken}`;
+        }
       } finally {
         setLoading(false);
       }
-    })();
+    };
+    initAuth();
   }, []);
 
-  async function signIn(email: string, password: string) {
-    // Mock auth: any password accepted for demo
-    const fakeUser = { id: 'u1', name: 'Demo User', email };
-    setUser(fakeUser);
-    await AsyncStorage.setItem('@app_user', JSON.stringify(fakeUser));
-    return true;
-  }
+  /* ===== LOGIN ===== */
+/* ===== LOGIN (FIXED) ===== */
+const signIn = async (username: string, password: string) => {
+  try {
+    const res = await axios.post(`${API_URL}/auth/signin`, {
+      username,
+      password,
+    });
 
-  async function signUp(name: string, email: string, password: string) {
-    const newUser = { id: 'u' + Date.now(), name, email };
-    setUser(newUser);
-    await AsyncStorage.setItem('@app_user', JSON.stringify(newUser));
-    return true;
-  }
+    console.log('✅ LOGIN RESPONSE:', res.data);
 
-  async function signOut() {
+    const {
+      token,
+      accessToken,
+      id,
+      email,
+      roles,
+    } = res.data;
+
+    // hỗ trợ cả token & accessToken
+    const jwt = token || accessToken;
+
+    if (!jwt) {
+      console.log('❌ JWT NOT FOUND IN RESPONSE');
+      return false;
+    }
+
+    const userData: User = {
+      id,
+      username,
+      email,
+      roles,
+    };
+
+    setToken(jwt);
+    setUser(userData);
+
+    axios.defaults.headers.common.Authorization = `Bearer ${jwt}`;
+
+    await AsyncStorage.setItem('token', jwt);
+    await AsyncStorage.setItem('user', JSON.stringify(userData));
+
+    console.log('🔐 TOKEN SAVED:', jwt);
+
+    return true;
+  } catch (err: any) {
+    console.log('🔥 Login error:', err.response?.data || err.message);
+    return false;
+  }
+};
+
+  /* ===== SIGNUP ===== */
+  const signUp = async (data: SignUpPayload) => {
+    try {
+      await axios.post(`${API_URL}/auth/signup`, data);
+      return true;
+    } catch (err) {
+      console.log('Signup error', err);
+      return false;
+    }
+  };
+
+  /* ===== LOGOUT ===== */
+  const signOut = async () => {
     setUser(null);
-    await AsyncStorage.removeItem('@app_user');
-  }
+    setToken(null);
+    delete axios.defaults.headers.common.Authorization;
+    await AsyncStorage.multiRemove(['token', 'user']);
+  };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, token, loading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );
-}
+};
+
+export const useAuth = () => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
+  return ctx;
+};

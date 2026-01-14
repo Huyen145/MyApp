@@ -1,4 +1,4 @@
-import { View, Text, Image, StyleSheet } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 
 export default function LocationScreen() {
   return (
@@ -6,7 +6,7 @@ export default function LocationScreen() {
       <Text style={styles.title}>Vị trí quán</Text>
 
       <Image
-        source={require("@/assets/images/logo.png")}
+        source={require("../assets/images/logo.jpg")}
         style={styles.map}
       />
 
