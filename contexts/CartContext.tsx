@@ -57,7 +57,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     } as Omit<CartItem, 'qty' | 'id'> & { productId?: number };
 
     const optionsKey = normalizedItem.options ? JSON.stringify(normalizedItem.options) : '';
-    const id = `${normalizedItem.productId ?? normalizedItem.id ?? 'p'}-${encodeURIComponent(optionsKey || 'default')}`;
+    const id = `${normalizedItem.productId ?? 'p'}-${encodeURIComponent(optionsKey || 'default')}`;
 
     setItems((cur) => {
       const exists = cur.find((i) => i.id === id);
